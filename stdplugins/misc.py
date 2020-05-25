@@ -1,36 +1,35 @@
-
-import datetime
 from telethon import events
-from telethon.errors.rpcerrorlist import YouBlockedUserError
-from telethon.tl.functions.account import UpdateNotifySettingsRequest
 from uniborg.util import admin_cmd
 
-@borg.on(admin_cmd("sg ?(.*)"))
+@borg.on(admin_cmd(pattern="sg"))
 async def _(event):
     if event.fwd_from:
-        return 
+        return
     if not event.reply_to_msg_id:
-       await event.edit("```Reply to any user message.```")
-       return
-    reply_message = await event.get_reply_message() 
-    if not reply_message.text:
-       await event.edit("```reply to text message```")
-       return
-    chat = "@SangMataInfo_bot"
-    sender = reply_message.sender
-    if reply_message.sender.bot:
-       await event.edit("```Reply to actual users message.```")
-       return
-    await event.edit("```Processing```")
-    async with borg.conversation(chat) as conv:
-          try:     
-              response = conv.wait_event(events.NewMessage(incoming=True,from_users=461843263))
-              await borg.forward_messages(chat, reply_message)
-              response = await response 
-          except YouBlockedUserError: 
-              await event.reply("```Please unblock @sangmatainfo_bot and try again```")
-              return
-          if response.text.startswith("Forward"):
-             await event.edit("```can you kindly disable your forward privacy settings for good?```")
-          else: 
-             await event.edit(f"{response.message.message}")
+        await event.edit("```Reply to any user message.```")
+        return
+    reply_message = await event.get_reply_message()
+    u_id = reply_message.from_id
+    #
+    chat = await event.client.get_entity("@SangMataInfo_bot")
+    #
+    await event.edit("`processing`")
+    async with event.client.conversation(chat) as conv:
+        try:
+            await conv.send_message(f"/search_id {u_id}")
+            msg2 = await conv.get_response()
+            # logger.info(msg2)
+            response = conv.wait_event(
+                events.NewMessage(incoming=True, from_users=chat.id)
+            )
+            msg2 = await response
+            # logger.info(msg2.stringify())
+            await event.edit(msg2.text)
+            await event.client.send_read_acknowledge(
+                entity=chat.id,
+                message=msg2,
+                clear_mentions=True
+            )
+        except Exception as e:
+            await event.reply(f"`RIP `: {str(e)}")
+            return
